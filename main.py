@@ -44,6 +44,7 @@ class Book(BaseModel):
             return ValueError("Title must contain at least one word")
         return title
 
+
 @app.post('/books', status_code=status.HTTP_201_CREATED)
 async def create_book(book: Book) -> list[Book]:
     books.append(book.dict())
@@ -51,9 +52,9 @@ async def create_book(book: Book) -> list[Book]:
 
 
 # Response Body using pydantic
-@app.post('/book', response_model=Book)
-async def create_book(book: Book) -> Any:
-    return book
+# @app.post('/book', response_model=Book)
+# async def create_book(book: Book) -> Any:
+#     return book
 
 
 # Handling HTTP Methods
