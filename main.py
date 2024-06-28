@@ -3,7 +3,7 @@ import os.path
 from fastapi import FastAPI, Query, Path, Form, File, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from typing import Annotated, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 import shutil
 
 # Basic Routing
@@ -34,10 +34,15 @@ async def search_book(q: Annotated[str | None, Query(pattern='book')]):
 
 # Request Body Parameter and Response Code
 class Book(BaseModel):
-    title: str
-    author: str
-    year: int
+    title: str = Field(min_length=1, max_length=100)
+    author: str = Field(min_length=1, max_length=50)
+    year: int = Field(ge=1900, le=2024)
 
+    @validator('title')
+    def title_must_contain_at_least_one_word(cls, title: str):
+        if len(title) < 1:
+            return ValueError("Title must contain at least one word")
+        return title
 
 @app.post('/books', status_code=status.HTTP_201_CREATED)
 async def create_book(book: Book) -> list[Book]:
