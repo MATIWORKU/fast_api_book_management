@@ -1,9 +1,9 @@
 import os.path
 
-from fastapi import FastAPI, Query, Path, Form, File, UploadFile, status
-from fastapi.responses import FileResponse, Response
-from typing import Annotated, Any
-from pydantic import BaseModel, Field, validator
+from fastapi import FastAPI, APIRouter, Path, Query, Form, File, UploadFile, status
+from fastapi.responses import FileResponse
+from typing import Annotated
+import book_model
 import shutil
 
 # Basic Routing
@@ -11,21 +11,23 @@ app = FastAPI()
 books = []
 upload_dir = "./uploaded_files"
 
+router = APIRouter(prefix="/books", tags=["books"])
 
-@app.get('/')
+
+@router.get('/')
 async def root():
     return {"Welcome": "To your Book Management System."}
 
 
 # Path Parameter
-@app.get('/books/{book_id}')
-async def get_book(book_id: Annotated[int, Path(ge=1, le=10)]):
+@router.get('/{book_id}')
+async def get_book(book_id: Annotated[int, Path(ge=0, le=10)]):
     return {"book_id": books[book_id]}
 
 
 # Query Parameter
-@app.get('/books/search/')
-async def search_book(q: Annotated[str | None, Query(pattern='book')]):
+@router.get('/search/')
+async def search_book(q: Annotated[str | None, Query(pattern='h')]):
     if q:
         requested_book = [book for book in books if q.lower() in book["title"].lower()]
         return {"books": requested_book}
@@ -33,20 +35,12 @@ async def search_book(q: Annotated[str | None, Query(pattern='book')]):
 
 
 # Request Body Parameter and Response Code
-class Book(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    author: str = Field(min_length=1, max_length=50)
-    year: int = Field(ge=1900, le=2024)
-
-    @validator('title')
-    def title_must_contain_at_least_one_word(cls, title: str):
-        if len(title) < 1:
-            return ValueError("Title must contain at least one word")
-        return title
-
-
-@app.post('/books', status_code=status.HTTP_201_CREATED)
-async def create_book(book: Book) -> list[Book]:
+@router.post('/', status_code=status.HTTP_201_CREATED)
+async def create_book(book: book_model.Book) -> list[book_model.Book]:
+    title = book.title
+    author = book.author
+    year = book.year
+    book = book_model.Book(title=title, author=author, year=year)
     books.append(book.dict())
     return books
 
@@ -58,14 +52,14 @@ async def create_book(book: Book) -> list[Book]:
 
 
 # Handling HTTP Methods
-@app.put('/books/{book_id}')
-async def update_book(book_id: Annotated[int, Path()], book: Book):
+@router.put('/{book_id}')
+async def update_book(book_id: Annotated[int, Path()], book: book_model.Book):
     if 0 <= book_id <= len(books):
         books[book_id] = book
     return {"message": "Book update successful", "book": book}
 
 
-@app.delete('/books/{book_id}')
+@router.delete('/{book_id}')
 async def delete_book(book_id: Annotated[int, Path(...)]):
     if 0 <= book_id <= len(books):
         removed_book = books.pop(book_id)
@@ -74,15 +68,15 @@ async def delete_book(book_id: Annotated[int, Path(...)]):
 
 
 # Form Data Submission
-@app.post('/books/form')
+@router.post('/form')
 async def create_book_form(title: Annotated[str, Form()], author: Annotated[str, Form()], year: int = Form()):
-    book = Book(title=title, author=author, year=year)
+    book = book_model.Book(title=title, author=author, year=year)
     books.append(book.dict())
     return {"message": "Book added via form", "book": book}
 
 
 # File Uploads
-@app.post('/upload')
+@router.post('/upload')
 async def upload_file(file: UploadFile = File()):
     file_path = os.path.join(upload_dir, file.filename)
     with open(f"{file_path}", "wb") as f:
@@ -91,9 +85,11 @@ async def upload_file(file: UploadFile = File()):
 
 
 # File download
-@app.get('/download/{book_name}')
+@router.get('/download/{book_name}')
 async def download_book(book_name: str):
     file_path = os.path.join(upload_dir, book_name)
     if not os.path.exists(file_path):
         return {"Error": "Path does not exist"}
     return FileResponse(file_path, filename=book_name, media_type="application/octet-stream")
+
+app.include_router(router)
