@@ -1,6 +1,6 @@
 import os.path
 
-from fastapi import FastAPI, APIRouter, Path, Query, Form, File, UploadFile, status
+from fastapi import FastAPI, APIRouter, Path, Query, Form, File, UploadFile, status, Depends
 from fastapi.responses import FileResponse
 from typing import Annotated
 import book_model
@@ -9,9 +9,15 @@ import shutil
 # Basic Routing
 app = FastAPI()
 books = []
-upload_dir = "./uploaded_files"
+
 
 router = APIRouter(prefix="/books", tags=["books"])
+
+
+async def get_upload_dir() -> str:
+    upload_dir = "./uploaded_files"
+    os.makedirs(upload_dir, exist_ok=True)
+    return upload_dir
 
 
 @router.get('/')
@@ -77,7 +83,7 @@ async def create_book_form(title: Annotated[str, Form()], author: Annotated[str,
 
 # File Uploads
 @router.post('/upload')
-async def upload_file(file: UploadFile = File()):
+async def upload_file(*,file: UploadFile = File(), upload_dir: Annotated[str, Depends(get_upload_dir)]):
     file_path = os.path.join(upload_dir, file.filename)
     with open(f"{file_path}", "wb") as f:
         shutil.copyfileobj(file.file, f)
@@ -86,7 +92,7 @@ async def upload_file(file: UploadFile = File()):
 
 # File download
 @router.get('/download/{book_name}')
-async def download_book(book_name: str):
+async def download_book(book_name: str, upload_dir: Annotated[str, Depends(get_upload_dir)]):
     file_path = os.path.join(upload_dir, book_name)
     if not os.path.exists(file_path):
         return {"Error": "Path does not exist"}
