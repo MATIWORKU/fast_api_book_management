@@ -14,6 +14,7 @@ books = []
 router = APIRouter(prefix="/books", tags=["books"])
 
 
+# functional dependency to MANAGE AND PROVIDE the upload directory path
 async def get_upload_dir() -> str:
     upload_dir = "./uploaded_files"
     os.makedirs(upload_dir, exist_ok=True)

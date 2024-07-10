@@ -3,16 +3,33 @@
 
 import os.path
 
-from fastapi import FastAPI, APIRouter, Path, Query, Form, File, UploadFile, status
+from fastapi import FastAPI, APIRouter, Path, Query, Form, File, UploadFile, status, Depends
 from fastapi.responses import FileResponse
 from typing import Annotated
 import shutil
 import book_model
 
-
 # Basic Routing
 app = FastAPI()
-upload_dir = "./uploaded_files"
+
+
+# Class to manage upload directory
+class UploadManager:
+    def __init__(self, upload_dir: str):
+        self.upload_dir = upload_dir
+        os.makedirs(self.upload_dir, exist_ok=True)
+
+    def get_upload_dir(self):
+        return self.upload_dir
+
+
+# Created an instance for class UploadManager
+upload_manager = UploadManager("./uploaded_files")
+
+
+# dependency to provide upload manager
+def get_upload_manager() -> UploadManager:
+    return upload_manager
 
 
 class BookManager:
@@ -69,19 +86,26 @@ class BookManager:
 
         # File Uploads
         @self.router.post('/upload')
-        async def upload_file(file: UploadFile = File()):
-            file_path = os.path.join(upload_dir, file.filename)
+        async def upload_file(
+                *,
+                file: UploadFile = File(),
+                upload_manager: Annotated[UploadManager, Depends(get_upload_manager)]
+        ):
+            file_path = os.path.join(upload_manager.get_upload_dir(), file.filename.lower())
             with open(f"{file_path}", "wb") as f:
                 shutil.copyfileobj(file.file, f)
             return {"message": "File Uploaded Successfully", "file": file.filename}
 
         # File download
         @self.router.get('/download/{book_name}')
-        async def download_book(book_name: str):
-            file_path = os.path.join(upload_dir, book_name)
+        async def download_book(
+                book_name: str,
+                upload_manager: Annotated[UploadManager, Depends(get_upload_manager)]
+        ):
+            file_path = os.path.join(upload_manager.get_upload_dir(), book_name.lower())
             if not os.path.exists(file_path):
                 return {"Error": "Path does not exist"}
-            return FileResponse(file_path, filename=book_name, media_type="application/octet-stream")
+            return FileResponse(file_path, filename=book_name.lower(), media_type="application/octet-stream")
 
 
 book_manager = BookManager()
